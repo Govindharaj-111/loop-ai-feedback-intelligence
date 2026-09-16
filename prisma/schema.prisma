@@ -1,0 +1,114 @@
+// Prisma Schema for Project LOOP — Multi-Tenant Feedback Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  feedbacks Feedback[]
+  themes    Theme[]
+  reports   Report[]
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("ADMIN") // ADMIN, ANALYST, VIEWER
+  workspaceId  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reportsGenerated Report[]  @relation("UserReports")
+
+  @@index([workspaceId])
+}
+
+model Feedback {
+  id             String   @id @default(uuid())
+  content        String
+  channel        String   @default("MANUAL") // MANUAL, CSV, API, SUPPORT
+  sourceRef      String?
+  customerLabel  String?
+  sentiment      String?  // Positive, Negative, Neutral
+  sentimentScore Float?
+  featureArea    String?  // Onboarding, Billing, Performance, UI/UX, Security
+  rationale      String?  // AI classification reasoning
+  status         String   @default("NEW") // NEW, REVIEWED, ACTIONED
+  workspaceId    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  themes    FeedbackTheme[]
+  embedding Embedding?
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, sentiment])
+  @@index([workspaceId, status])
+}
+
+model Theme {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  feedbacks FeedbackTheme[]
+
+  @@index([workspaceId])
+}
+
+model FeedbackTheme {
+  feedbackId String
+  themeId    String
+  confidence Float    @default(1.0)
+  assignedAt DateTime @default(now())
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  theme    Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+
+  @@id([feedbackId, themeId])
+}
+
+model Embedding {
+  id         String   @id @default(uuid())
+  feedbackId String   @unique
+  vector     String   // Serialized vector array
+  createdAt  DateTime @default(now())
+
+  feedback Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  title       String
+  periodStart DateTime
+  periodEnd   DateTime
+  contentJson String
+  workspaceId String
+  generatedBy String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  generator User      @relation("UserReports", fields: [generatedBy], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
