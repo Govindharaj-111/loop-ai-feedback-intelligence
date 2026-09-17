@@ -42,12 +42,21 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
 
     if (dateFrom || dateTo) {
       whereClause.createdAt = {};
-      if (dateFrom) whereClause.createdAt.gte = new Date(dateFrom);
-      if (dateTo) whereClause.createdAt.lte = new Date(dateTo);
+
+      if (dateFrom) {
+        whereClause.createdAt.gte = new Date(dateFrom);
+      }
+
+      if (dateTo) {
+        whereClause.createdAt.lte = new Date(dateTo);
+      }
     }
 
     const [total, feedbacks] = await Promise.all([
-      prisma.feedback.count({ where: whereClause }),
+      prisma.feedback.count({
+        where: whereClause,
+      }),
+
       prisma.feedback.findMany({
         where: whereClause,
         orderBy: { createdAt: "desc" },
@@ -55,7 +64,9 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
         take: limit,
         include: {
           themes: {
-            include: { theme: true },
+            include: {
+              theme: true,
+            },
           },
         },
       }),
@@ -72,11 +83,17 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({
+        error: error.message,
+      });
       return;
     }
+
     console.error("Fetch feedback error:", error);
-    res.status(500).json({ error: "Failed to fetch feedback" });
+
+    res.status(500).json({
+      error: "Failed to fetch feedback",
+    });
   }
 });
 
@@ -84,10 +101,26 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { content, channel, sourceRef, customerLabel, sentiment, sentimentScore, status, createdAt } = req.body;
 
-    if (!content || typeof content !== "string" || content.trim().length === 0) {
-      res.status(400).json({ error: "Content is required for feedback" });
+    const {
+      content,
+      channel,
+      sourceRef,
+      customerLabel,
+      sentiment,
+      sentimentScore,
+      status,
+      createdAt,
+    } = req.body;
+
+    if (
+      !content ||
+      typeof content !== "string" ||
+      content.trim().length === 0
+    ) {
+      res.status(400).json({
+        error: "Content is required for feedback",
+      });
       return;
     }
 
@@ -98,64 +131,62 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
         sourceRef: sourceRef || null,
         customerLabel: customerLabel || null,
         sentiment: sentiment || "Neutral",
-        sentimentScore: typeof sentimentScore === "number" ? sentimentScore : null,
+        sentimentScore:
+          typeof sentimentScore === "number" ? sentimentScore : null,
         status: status || "NEW",
         createdAt: createdAt ? new Date(createdAt) : new Date(),
         workspaceId: session.workspaceId,
       },
     });
 
-    res.status(201).json({ feedback });
+    res.status(201).json({
+      feedback,
+    });
   } catch (error: any) {
     if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({
+        error: error.message,
+      });
       return;
     }
+
     console.error("Create feedback error:", error);
-    res.status(500).json({ error: "Failed to create feedback" });
+
+    res.status(500).json({
+      error: "Failed to create feedback",
+    });
   }
 });
 
 // POST /api/feedback/classify
-router.post("/classify", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { feedbackId } = req.body;
+router.post(
+  "/classify",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireRole(["ADMIN", "ANALYST"], req);
+      const { feedbackId } = req.body;
 
-    if (feedbackId) {
-      const feedback = await prisma.feedback.findUnique({
-        where: { id: feedbackId },
-      });
+      if (feedbackId) {
+        const feedback = await prisma.feedback.findUnique({
+          where: { id: feedbackId },
+        });
 
-      if (!feedback || feedback.workspaceId !== session.workspaceId) {
-        res.status(404).json({ error: "Feedback item not found" });
-        return;
-      }
+        if (
+          !feedback ||
+          feedback.workspaceId !== session.workspaceId
+        ) {
+          res.status(404).json({
+            error: "Feedback item not found",
+          });
+          return;
+        }
 
-      const classification = await classifyFeedbackText(feedback.content);
+        const classification = await classifyFeedbackText(
+          feedback.content
+        );
 
-      const updated = await prisma.feedback.update({
-        where: { id: feedbackId },
-        data: {
-          sentiment: classification.sentiment,
-          sentimentScore: classification.sentimentScore,
-          featureArea: classification.featureArea,
-          rationale: classification.rationale,
-        },
-      });
-
-      await ensureFeedbackEmbedding(feedback.id, feedback.content);
-      res.json({ feedback: updated, classification });
-    } else {
-      const unclassified = await prisma.feedback.findMany({
-        where: { workspaceId: session.workspaceId },
-      });
-
-      let count = 0;
-      for (const fb of unclassified) {
-        const classification = await classifyFeedbackText(fb.content);
-        await prisma.feedback.update({
-          where: { id: fb.id },
+        const updated = await prisma.feedback.update({
+          where: { id: feedbackId },
           data: {
             sentiment: classification.sentiment,
             sentimentScore: classification.sentimentScore,
@@ -163,216 +194,374 @@ router.post("/classify", async (req: Request, res: Response): Promise<void> => {
             rationale: classification.rationale,
           },
         });
-        await ensureFeedbackEmbedding(fb.id, fb.content);
-        count++;
+
+        await ensureFeedbackEmbedding(
+          feedback.id,
+          feedback.content
+        );
+
+        res.json({
+          feedback: updated,
+          classification,
+        });
+      } else {
+        const unclassified = await prisma.feedback.findMany({
+          where: {
+            workspaceId: session.workspaceId,
+          },
+        });
+
+        let count = 0;
+
+        for (const fb of unclassified) {
+          const classification = await classifyFeedbackText(
+            fb.content
+          );
+
+          await prisma.feedback.update({
+            where: { id: fb.id },
+            data: {
+              sentiment: classification.sentiment,
+              sentimentScore: classification.sentimentScore,
+              featureArea: classification.featureArea,
+              rationale: classification.rationale,
+            },
+          });
+
+          await ensureFeedbackEmbedding(
+            fb.id,
+            fb.content
+          );
+
+          count++;
+        }
+
+        res.json({
+          message: `Successfully classified ${count} feedback items`,
+          count,
+        });
+      }
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
       }
 
-      res.json({ message: `Successfully classified ${count} feedback items`, count });
+      console.error("Classification error:", error);
+
+      res.status(500).json({
+        error: "Failed to classify feedback",
+      });
     }
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
-    }
-    console.error("Classification error:", error);
-    res.status(500).json({ error: "Failed to classify feedback" });
   }
-});
+);
 
-// POST /api/feedback/import (accepts json body with csv text or items)
-router.post("/import", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const csvContent = req.body.csv || req.body.text;
+// POST /api/feedback/import
+router.post(
+  "/import",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireRole(["ADMIN", "ANALYST"], req);
 
-    if (!csvContent || typeof csvContent !== "string") {
-      res.status(400).json({ error: "No CSV content provided" });
-      return;
-    }
+      const csvContent = req.body.csv || req.body.text;
 
-    const parseResult = parseFeedbackCsv(csvContent);
+      if (!csvContent || typeof csvContent !== "string") {
+        res.status(400).json({
+          error: "No CSV content provided",
+        });
+        return;
+      }
 
-    if (parseResult.validRows.length === 0) {
-      res.status(400).json({
-        error: "No valid feedback rows found in CSV",
+      const parseResult = parseFeedbackCsv(csvContent);
+
+      if (parseResult.validRows.length === 0) {
+        res.status(400).json({
+          error: "No valid feedback rows found in CSV",
+          failedCount: parseResult.failedRows.length,
+          failedRows: parseResult.failedRows,
+        });
+        return;
+      }
+
+      const dataToInsert = parseResult.validRows.map((row) => ({
+        content: row.content,
+        channel: row.channel,
+        customerLabel: row.customerLabel || null,
+        createdAt: row.createdAt || new Date(),
+        sentiment: row.sentiment || "Neutral",
+        status: row.status || "NEW",
+        workspaceId: session.workspaceId,
+      }));
+
+      await prisma.feedback.createMany({
+        data: dataToInsert,
+      });
+
+      res.json({
+        message: `Successfully imported ${parseResult.validRows.length} feedback items`,
+        importedCount: parseResult.validRows.length,
         failedCount: parseResult.failedRows.length,
         failedRows: parseResult.failedRows,
       });
-      return;
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      console.error("CSV Import error:", error);
+
+      res.status(500).json({
+        error:
+          error.message ||
+          "Failed to process CSV import file",
+      });
     }
-
-    const dataToInsert = parseResult.validRows.map((row) => ({
-      content: row.content,
-      channel: row.channel,
-      customerLabel: row.customerLabel || null,
-      createdAt: row.createdAt || new Date(),
-      sentiment: row.sentiment || "Neutral",
-      status: row.status || "NEW",
-      workspaceId: session.workspaceId,
-    }));
-
-    await prisma.feedback.createMany({
-      data: dataToInsert,
-    });
-
-    res.json({
-      message: `Successfully imported ${parseResult.validRows.length} feedback items`,
-      importedCount: parseResult.validRows.length,
-      failedCount: parseResult.failedRows.length,
-      failedRows: parseResult.failedRows,
-    });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
-    }
-    console.error("CSV Import error:", error);
-    res.status(500).json({ error: error.message || "Failed to process CSV import file" });
   }
-});
+);
 
 // POST /api/feedback/simulate
-router.post("/simulate", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { channelType } = req.body;
+router.post(
+  "/simulate",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireRole(["ADMIN", "ANALYST"], req);
 
-    const simulatedItems = getSimulatedFeed(channelType || "all");
+      const { channelType } = req.body;
 
-    const dataToInsert = simulatedItems.map((item) => ({
-      content: item.content,
-      channel: item.channel,
-      customerLabel: item.customerLabel,
-      sentiment: item.sentiment,
-      status: item.status,
-      createdAt: item.createdAt,
-      workspaceId: session.workspaceId,
-    }));
+      const simulatedItems = getSimulatedFeed(
+        channelType || "all"
+      );
 
-    await prisma.feedback.createMany({
-      data: dataToInsert,
-    });
+      const dataToInsert = simulatedItems.map((item) => ({
+        content: item.content,
+        channel: item.channel,
+        customerLabel: item.customerLabel,
+        sentiment: item.sentiment,
+        status: item.status,
+        createdAt: item.createdAt,
+        workspaceId: session.workspaceId,
+      }));
 
-    res.json({
-      message: `Simulated channel feed imported successfully`,
-      importedCount: dataToInsert.length,
-    });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
+      await prisma.feedback.createMany({
+        data: dataToInsert,
+      });
+
+      res.json({
+        message:
+          "Simulated channel feed imported successfully",
+        importedCount: dataToInsert.length,
+      });
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      console.error("Simulated ingestion error:", error);
+
+      res.status(500).json({
+        error: "Failed to simulate channel ingestion",
+      });
     }
-    console.error("Simulated ingestion error:", error);
-    res.status(500).json({ error: "Failed to simulate channel ingestion" });
   }
-});
+);
 
 // GET /api/feedback/:id
-router.get("/:id", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireAuth(req);
-    const { id } = req.params;
+router.get(
+  "/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireAuth(req);
 
-    const feedback = await prisma.feedback.findUnique({
-      where: { id },
-      include: {
-        themes: {
-          include: { theme: true },
+      const id = String(req.params.id);
+
+      const feedback = await prisma.feedback.findUnique({
+        where: { id },
+        include: {
+          themes: {
+            include: {
+              theme: true,
+            },
+          },
         },
-      },
-    });
+      });
 
-    if (!feedback) {
-      res.status(404).json({ error: "Feedback item not found" });
-      return;
-    }
+      if (!feedback) {
+        res.status(404).json({
+          error: "Feedback item not found",
+        });
+        return;
+      }
 
-    if (feedback.workspaceId !== session.workspaceId) {
-      res.status(403).json({ error: "Forbidden: Cross-workspace access attempt blocked" });
-      return;
-    }
+      if (feedback.workspaceId !== session.workspaceId) {
+        res.status(403).json({
+          error:
+            "Forbidden: Cross-workspace access attempt blocked",
+        });
+        return;
+      }
 
-    res.json({ feedback });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
+      res.json({
+        feedback,
+      });
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      res.status(500).json({
+        error: "Failed to fetch feedback",
+      });
     }
-    res.status(500).json({ error: "Failed to fetch feedback" });
   }
-});
+);
 
 // PATCH /api/feedback/:id
-router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { id } = req.params;
+router.patch(
+  "/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireRole(
+        ["ADMIN", "ANALYST"],
+        req
+      );
 
-    const existingFeedback = await prisma.feedback.findUnique({ where: { id } });
+      const id = String(req.params.id);
 
-    if (!existingFeedback) {
-      res.status(404).json({ error: "Feedback item not found" });
-      return;
+      const existingFeedback =
+        await prisma.feedback.findUnique({
+          where: { id },
+        });
+
+      if (!existingFeedback) {
+        res.status(404).json({
+          error: "Feedback item not found",
+        });
+        return;
+      }
+
+      if (
+        existingFeedback.workspaceId !==
+        session.workspaceId
+      ) {
+        res.status(403).json({
+          error:
+            "Forbidden: Cross-workspace access attempt blocked",
+        });
+        return;
+      }
+
+      const {
+        content,
+        channel,
+        sourceRef,
+        customerLabel,
+        sentiment,
+        sentimentScore,
+        status,
+      } = req.body;
+
+      const updatedFeedback =
+        await prisma.feedback.update({
+          where: { id },
+          data: {
+            ...(content !== undefined && { content }),
+            ...(channel !== undefined && { channel }),
+            ...(sourceRef !== undefined && { sourceRef }),
+            ...(customerLabel !== undefined && {
+              customerLabel,
+            }),
+            ...(sentiment !== undefined && { sentiment }),
+            ...(sentimentScore !== undefined && {
+              sentimentScore,
+            }),
+            ...(status !== undefined && { status }),
+          },
+        });
+
+      res.json({
+        feedback: updatedFeedback,
+      });
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      res.status(500).json({
+        error: "Failed to update feedback",
+      });
     }
-
-    if (existingFeedback.workspaceId !== session.workspaceId) {
-      res.status(403).json({ error: "Forbidden: Cross-workspace access attempt blocked" });
-      return;
-    }
-
-    const { content, channel, sourceRef, customerLabel, sentiment, sentimentScore, status } = req.body;
-
-    const updatedFeedback = await prisma.feedback.update({
-      where: { id },
-      data: {
-        ...(content !== undefined && { content }),
-        ...(channel !== undefined && { channel }),
-        ...(sourceRef !== undefined && { sourceRef }),
-        ...(customerLabel !== undefined && { customerLabel }),
-        ...(sentiment !== undefined && { sentiment }),
-        ...(sentimentScore !== undefined && { sentimentScore }),
-        ...(status !== undefined && { status }),
-      },
-    });
-
-    res.json({ feedback: updatedFeedback });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
-    }
-    res.status(500).json({ error: "Failed to update feedback" });
   }
-});
+);
 
 // DELETE /api/feedback/:id
-router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { id } = req.params;
+router.delete(
+  "/:id",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const session = await requireRole(
+        ["ADMIN", "ANALYST"],
+        req
+      );
 
-    const existingFeedback = await prisma.feedback.findUnique({ where: { id } });
+      const id = String(req.params.id);
 
-    if (!existingFeedback) {
-      res.status(404).json({ error: "Feedback item not found" });
-      return;
+      const existingFeedback =
+        await prisma.feedback.findUnique({
+          where: { id },
+        });
+
+      if (!existingFeedback) {
+        res.status(404).json({
+          error: "Feedback item not found",
+        });
+        return;
+      }
+
+      if (
+        existingFeedback.workspaceId !==
+        session.workspaceId
+      ) {
+        res.status(403).json({
+          error:
+            "Forbidden: Cross-workspace access attempt blocked",
+        });
+        return;
+      }
+
+      await prisma.feedback.delete({
+        where: { id },
+      });
+
+      res.json({
+        message: "Feedback deleted successfully",
+      });
+    } catch (error: any) {
+      if (error.statusCode) {
+        res.status(error.statusCode).json({
+          error: error.message,
+        });
+        return;
+      }
+
+      res.status(500).json({
+        error: "Failed to delete feedback",
+      });
     }
-
-    if (existingFeedback.workspaceId !== session.workspaceId) {
-      res.status(403).json({ error: "Forbidden: Cross-workspace access attempt blocked" });
-      return;
-    }
-
-    await prisma.feedback.delete({ where: { id } });
-
-    res.json({ message: "Feedback deleted successfully" });
-  } catch (error: any) {
-    if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
-      return;
-    }
-    res.status(500).json({ error: "Failed to delete feedback" });
   }
-});
+);
 
 export default router;
