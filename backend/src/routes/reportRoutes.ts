@@ -80,7 +80,7 @@ router.post("/generate", async (req: Request, res: Response): Promise<void> => {
 router.get("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireAuth(req);
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const report = await prisma.report.findUnique({
       where: { id },
@@ -115,7 +115,7 @@ router.get("/:id", async (req: Request, res: Response): Promise<void> => {
 router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN", "ANALYST"], req);
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const report = await prisma.report.findUnique({ where: { id } });
 
