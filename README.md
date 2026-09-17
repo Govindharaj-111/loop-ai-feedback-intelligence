@@ -1,234 +1,168 @@
 # Project LOOP — AI Customer-Feedback Intelligence Platform
 
-[![Next.js 15](https://img.shields.io/badge/Next.js-15.1-black?logo=next.js)](https://nextjs.org/)
+[![Next.js 15](https://img.shields.io/badge/Frontend-Next.js_15-black?logo=next.js)](https://nextjs.org/)
+[![Express.js](https://img.shields.io/badge/Backend-Express.js_4-green?logo=express)](https://expressjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-6.4-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**Project LOOP** (*Learning & Optimization from Online Feedback*) is an enterprise-ready, multi-tenant AI Customer-Feedback Intelligence Platform. It aggregates unstructured customer feedback—support tickets, app store reviews, NPS survey responses, sales call notes, and community posts—and transforms it into structured, actionable insights, grounded semantic Q&A, and executive Voice-of-Customer (VoC) reports.
+**Project LOOP** (*Learning & Optimization from Online Feedback*) is an enterprise-ready, multi-tenant AI Customer-Feedback Intelligence Platform.
+
+It is decoupled into an **independent Next.js Frontend (`frontend/`)** and an **Express.js Backend API Server (`backend/`)** for flexible, scalable, and independent deployment.
 
 ---
 
-## 1. Problem Statement
-
-Product, Engineering, and Customer Success teams in multi-tenant SaaS organizations struggle with fragmented, unstructured user feedback scattered across Zendesk, App Store reviews, Intercom, and CRM notes. Manually categorizing thousands of comments is slow and error-prone, while generic LLMs often hallucinate metrics or leak confidential tenant data across workspace boundaries.
-
-**Project LOOP solves this by:**
-* Enforcing **strict multi-tenant data isolation** at the database, query, vector search, and API route level.
-* Providing **automated AI classification** and Zod-validated structured outputs.
-* Delivering a **Grounded RAG Q&A Engine (`Ask LOOP`)** that cites exact feedback evidence and refuses to invent facts.
-* Calculating **verified server-side database statistics** for executive Voice-of-Customer (VoC) reports with one-click print/PDF export.
-
----
-
-## 2. Key Features
-
-* 🔒 **Multi-Tenant Security Architecture:** Every database query, vector search, and report synthesis is unconditionally filtered by server session `workspaceId`.
-* 👥 **Role-Based Access Control (RBAC):** Server-enforced permissions for `ADMIN` (full control + user management), `ANALYST` (feedback CRUD + AI models), and `VIEWER` (read-only dashboards).
-* 📥 **Multi-Channel Feedback Ingestion:** Manual entry, bulk CSV import with row-by-row error validation, and 1-click simulated channel feeds (Support Tickets, App Reviews, NPS, Sales Calls).
-* 📊 **Analytics Dashboard & Recharts:** Real-time KPI cards and responsive visualizations for Feedback Volume Over Time, Sentiment Distribution, and Ingestion Channels.
-* 🤖 **AI Auto-Classification & Theme Clustering:** NLP parsing of sentiment, sentiment score, feature area, and rationale validated via Zod runtime schemas.
-* 📈 **Trend Velocity Engine:** Period-over-period trend analysis classifying topics into `SPIKING`, `INCREASING`, `STABLE`, or `DECREASING`.
-* 💬 **Ask LOOP (Grounded RAG Q&A):** Semantic vector search retrieving relevant tenant feedback evidence with clickable citation callouts and strict zero-hallucination rules.
-* 📄 **Voice-of-Customer (VoC) Reports:** Verified server statistics aggregation + Claude executive synthesis with print/PDF export capabilities.
-
----
-
-## 3. Architecture & Data Flow
+## 1. System Architecture
 
 ```text
-                       ┌─────────────────────────┐
-                       │  Unstructured Feedback  │
-                       └────────────┬────────────┘
-                                    │
-                         ┌──────────┴──────────┐
-                         │ Ingestion Pipeline  │ (Manual / CSV / Simulated)
-                         └──────────┬──────────┘
-                                    │
-                         ┌──────────┴──────────┐
-                         │  Multi-Tenant Guard │ (workspaceId Session Filtering)
-                         └──────────┬──────────┘
-                                    │
-        ┌───────────────────┬───────┴───────────┬───────────────────┐
-        ▼                   ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│ Auto-         │   │ Theme         │   │ Grounded RAG  │   │ Executive VoC │
-│ Classification│   │ Clustering &  │   │ Vector Search │   │ Reports &     │
-│ (Zod Valid)   │   │ Trend Velocity│   │ (Ask LOOP)    │   │ Print Export  │
-└───────────────┘   └───────────────┘   └───────────────┘   └───────────────┘
+┌────────────────────────────────────────┐     HTTP-only Cookies / API Proxy     ┌────────────────────────────────────────┐
+│          FRONTEND APPLICATION          │ ────────────────────────────────────> │          BACKEND API SERVER            │
+│         (Next.js 15 / React 19)        │                                       │        (Express.js / TypeScript)       │
+│                                        │ <──────────────────────────────────── │                                        │
+│  - Landing Page & Authentication UI    │         JSON API Responses            │  - Prisma ORM & Database Persistence   │
+│  - Analytics Dashboard & Recharts      │                                       │  - JWT Session Auth & Security Guards  │
+│  - Feedback Inbox & Triage Controls    │                                       │  - AI Auto-Classification Engine       │
+│  - Ask LOOP Grounded RAG Chat UI       │                                       │  - Vector Embedding Search & RAG       │
+│  - VoC Executive Report Viewer & PDF   │                                       │  - Automated QA Security Test Suites   │
+└────────────────────────────────────────┘                                       └────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Tech Stack & Dependencies
+## 2. Directory Layout
 
-* **Framework:** Next.js 15 (App Router, Server Actions, API Routes)
-* **Language:** TypeScript 5.7
-* **Database & ORM:** PostgreSQL / SQLite with Prisma ORM 6.4
-* **Authentication:** Password Hashing (`bcryptjs`), JWT Session Tokens (`jose`), HTTP-only Cookies
-* **Styling & Icons:** Tailwind CSS 3.4, Lucide React Icons
-* **Data Visualization:** Recharts 2.15
-* **AI & Validation:** Anthropic Claude API (`@anthropic-ai/sdk`), Zod 3.24, Vector Cosine Similarity Engine
-
----
-
-## 5. Database Schema
-
-```prisma
-model Workspace {
-  id        String     @id @default(uuid())
-  name      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  users     User[]
-  feedbacks Feedback[]
-  themes    Theme[]
-  reports   Report[]
-}
-
-model User {
-  id           String    @id @default(uuid())
-  name         String
-  email        String    @unique
-  passwordHash String
-  role         String    @default("ADMIN") // ADMIN, ANALYST, VIEWER
-  workspaceId  String
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@index([workspaceId])
-}
-
-model Feedback {
-  id             String   @id @default(uuid())
-  content        String
-  channel        String   @default("MANUAL")
-  customerLabel  String?
-  sentiment      String?  // Positive, Neutral, Negative
-  sentimentScore Float?
-  featureArea    String?
-  rationale      String?
-  status         String   @default("NEW") // NEW, REVIEWED, ACTIONED
-  workspaceId    String
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  @@index([workspaceId])
-}
+```text
+project-loop/
+├── frontend/                     # Standalone Next.js 15 Web Application
+│   ├── src/
+│   │   ├── app/                 # Next.js App Router (Landing, Login, Dashboard)
+│   │   ├── components/          # React Components & UI System
+│   │   └── types/               # TypeScript Type Definitions
+│   ├── next.config.ts           # API Proxy configuration to Backend Server
+│   ├── tailwind.config.ts       # Design System & Styling configuration
+│   └── package.json             # Frontend Dependencies & Scripts
+│
+├── backend/                      # Standalone Express.js + TypeScript API Server
+│   ├── src/
+│   │   ├── routes/              # Express API Route Handlers
+│   │   ├── lib/                 # Core Business Logic (Prisma, Auth, AI, RAG)
+│   │   ├── types/               # Server Type Definitions
+│   │   └── server.ts            # Main Server Entrypoint
+│   ├── prisma/                  # Database Schema, Seed Script & SQLite DB
+│   ├── tests/                   # Automated Security & Quality Test Suites
+│   └── package.json             # Backend Dependencies & Scripts
+│
+├── package.json                  # Root Monorepo Orchestration Scripts
+└── README.md                     # Project & Deployment Documentation
 ```
 
 ---
 
-## 6. Setup & Installation
+## 3. Quick Start & Local Development
 
 ### Prerequisites
-* Node.js v18.0.0 or higher
-* npm v9.0.0 or higher
+* **Node.js**: v18.0.0 or higher
+* **npm**: v9.0.0 or higher
 
-### Installation Steps
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/project-loop.git
-   cd project-loop
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment variables:**
-   Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-
-4. **Initialize database schema:**
-   ```bash
-   npx prisma db push
-   ```
-
-5. **Seed production-grade demo data (120+ records + 3 demo accounts):**
-   ```bash
-   npx prisma db seed
-   ```
-
-6. **Start local development server:**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 7. Environment Variables Reference
-
-```env
-# Database Connection String (SQLite for dev, PostgreSQL for production)
-DATABASE_URL="file:./dev.db"
-
-# JWT & Authentication Secrets
-JWT_SECRET="project-loop-super-secret-jwt-key-2026-secure"
-NEXTAUTH_SECRET="project-loop-super-secret-jwt-key-2026-secure"
-
-# Application Base URL
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-
-# AI Integration — Anthropic Claude API Key (Kept strictly server-side)
-ANTHROPIC_API_KEY="your-anthropic-claude-api-key"
-```
-
----
-
-## 8. Demo Accounts & Credentials
-
-The seed script creates the following production-safe demo credentials under workspace `"Acme Feedback Intelligence"`:
-
-| Role | Email Address | Password | Permissions & Access Scope |
-| :--- | :--- | :--- | :--- |
-| **`ADMIN`** | `admin@acme.com` | `AdminPass123!` | Full control: Feedback CRUD, CSV import, AI models, VoC reports, User Management. |
-| **`ANALYST`** | `analyst@acme.com` | `AnalystPass123!` | Operational analytics: Feedback CRUD, CSV import, AI models, VoC reports. Restricted from User Management. |
-| **`VIEWER`** | `viewer@acme.com` | `ViewerPass123!` | Read-only access: View Dashboards, Inbox, Trends, Ask LOOP, and VoC Reports. Restricted from write/delete. |
-
----
-
-## 9. AI Engine Configuration
-
-* **Anthropic Claude Integration:** Routes through server-side helper [`src/lib/aiService.ts`](file:///c:/Users/GR/Desktop/project%20loop/src/lib/aiService.ts).
-* **Zero-Hallucination Grounded RAG:** Vector search strictly filters embeddings by `workspaceId` before performing cosine similarity. If zero evidence is retrieved, the assistant refuses to invent data.
-* **Offline Resilience:** Includes local NLP heuristic fallback engines ensuring 100% feature availability even when network or API keys are unavailable.
-
----
-
-## 10. Production Deployment (Vercel + PostgreSQL)
-
-1. **Database Setup (Supabase / Neon):**
-   Create a PostgreSQL database and update `prisma/schema.prisma`:
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("DATABASE_URL")
-   }
-   ```
-2. **Deploy to Vercel:**
-   * Push code to GitHub repository.
-   * Import project into Vercel dashboard.
-   * Add environment variables (`DATABASE_URL`, `JWT_SECRET`, `ANTHROPIC_API_KEY`).
-   * Vercel build command automatically runs `npx prisma db push`.
-
----
-
-## 11. Automated Test Suite
-
-Run the comprehensive master security test suite:
+### Running Frontend and Backend Together
 ```bash
-npx tsx tests/master_security.test.ts
+# Install root dependencies
+npm install
+
+# Push database schema & seed demo data in backend
+npm run db:push
+npm run db:seed
+
+# Run both Backend (Port 5000) and Frontend (Port 3000) concurrently
+npm run dev
 ```
 
-**Test Coverage Summary:** 53/53 PASSED (100% clean execution across Phase 1, 2, 3, 4, and 5 security audits).
+* **Frontend UI:** `http://localhost:3000`
+* **Backend API:** `http://localhost:5000/api`
+* **Health Check:** `http://localhost:5000/api/health`
+
+### Demo Credentials
+* **ADMIN Account:** `admin@acme.com` / `AdminPass123!`
+* **ANALYST Account:** `analyst@acme.com` / `AnalystPass123!`
+* **VIEWER Account:** `viewer@acme.com` / `ViewerPass123!`
 
 ---
 
-## 12. Known Limitations & Future Roadmap
+## 4. Independent Deployment Guide
 
-* **Phase 4.0 (Planned):** Native Zendesk & Intercom OAuth integration webhooks.
-* **Phase 4.1 (Planned):** Real-time Slack / Microsoft Teams alert notifications for P0 bug clusters.
+### A. Deploying the Backend API Server (`backend/`)
+The backend is a Node.js/Express application with Prisma ORM.
+
+**Target Services:** Render, Railway, AWS ECS, Heroku, Docker, or DigitalOcean App Platform.
+
+1. **Build Step:**
+   ```bash
+   cd backend
+   npm install
+   npx prisma db push
+   npx prisma db seed
+   npm run build
+   ```
+2. **Start Command:**
+   ```bash
+   npm start   # Runs `node dist/server.js`
+   ```
+3. **Environment Variables:**
+   ```env
+   PORT=5000
+   DATABASE_URL="file:./dev.db" # or PostgreSQL URL: postgresql://user:pass@host:5432/dbname
+   JWT_SECRET="your-production-jwt-secret-key"
+   ANTHROPIC_API_KEY="your-anthropic-api-key"
+   FRONTEND_URL="https://your-frontend-domain.vercel.app"
+   ```
+
+### B. Deploying the Frontend Application (`frontend/`)
+The frontend is a Next.js 15 application.
+
+**Target Services:** Vercel, Netlify, Cloudflare Pages, or AWS Amplify.
+
+1. **Build Step:**
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   ```
+2. **Environment Variables:**
+   ```env
+   NEXT_PUBLIC_API_URL="https://your-backend-api-domain.onrender.com"
+   BACKEND_URL="https://your-backend-api-domain.onrender.com"
+   ```
+
+---
+
+## 5. Automated Security & QA Tests
+
+Execute the master security test suite in the backend service:
+
+```bash
+# Run backend security test suite
+npm test
+
+# Run individual test phases
+npm --prefix backend run test:phase1
+npm --prefix backend run test:phase2
+npm --prefix backend run test:phase3
+npm --prefix backend run test:phase4
+```
+
+---
+
+## 6. Key Platform Capabilities
+
+* 🔒 **Multi-Tenant Security Architecture:** Unconditional session `workspaceId` enforcement across all database queries and vector RAG searches.
+* 👥 **Role-Based Access Control (RBAC):** Granular permissions for `ADMIN`, `ANALYST`, and `VIEWER` roles.
+* 📥 **Multi-Channel Ingestion:** Bulk CSV parsing with row-by-row error reporting, manual entry, and simulated channel feeds.
+* 🤖 **AI Auto-Classification:** Anthropic Claude API sentiment analysis with Zod runtime schema validation.
+* 💬 **Ask LOOP (Grounded RAG):** Vector cosine similarity search with grounded evidence quotes and zero-hallucination controls.
+* 📄 **Executive VoC Reports:** Verified server-side database statistics + structured executive VoC synthesis with print/PDF export.
+
+---
+
+## License
+[MIT](LICENSE) © 2026 Project LOOP Team
