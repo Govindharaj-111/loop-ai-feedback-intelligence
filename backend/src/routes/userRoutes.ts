@@ -1,3 +1,4 @@
+```ts
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireRole } from "../lib/security.js";
@@ -29,7 +30,10 @@ router.get("/", async (req: Request, res: Response): Promise<void> => {
       res.status(error.statusCode).json({ error: error.message });
       return;
     }
-    res.status(500).json({ error: "Failed to fetch workspace users" });
+
+    res.status(500).json({
+      error: "Failed to fetch workspace users",
+    });
   }
 });
 
@@ -40,21 +44,29 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     const { name, email, password, role } = req.body;
 
     if (!name || !email || !password || !role) {
-      res.status(400).json({ error: "Name, email, password, and role are required" });
+      res.status(400).json({
+        error: "Name, email, password, and role are required",
+      });
       return;
     }
 
     if (!["ADMIN", "ANALYST", "VIEWER"].includes(role)) {
-      res.status(400).json({ error: "Invalid role. Must be ADMIN, ANALYST, or VIEWER" });
+      res.status(400).json({
+        error: "Invalid role. Must be ADMIN, ANALYST, or VIEWER",
+      });
       return;
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: {
+        email: email.toLowerCase().trim(),
+      },
     });
 
     if (existingUser) {
-      res.status(400).json({ error: "User with this email already exists" });
+      res.status(400).json({
+        error: "User with this email already exists",
+      });
       return;
     }
 
@@ -78,13 +90,20 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    res.status(201).json({ user: newUser });
+    res.status(201).json({
+      user: newUser,
+    });
   } catch (error: any) {
     if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({
+        error: error.message,
+      });
       return;
     }
-    res.status(500).json({ error: "Failed to create user" });
+
+    res.status(500).json({
+      error: "Failed to create user",
+    });
   }
 });
 
@@ -92,24 +111,34 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN"], req);
-    const { id } = req.params;
 
-    const targetUser = await prisma.user.findUnique({ where: { id } });
+    // Convert Express route parameter to a string
+    const id = String(req.params.id);
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+    });
 
     if (!targetUser) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({
+        error: "User not found",
+      });
       return;
     }
 
     if (targetUser.workspaceId !== session.workspaceId) {
-      res.status(403).json({ error: "Forbidden: Cross-workspace access attempt blocked" });
+      res.status(403).json({
+        error: "Forbidden: Cross-workspace access attempt blocked",
+      });
       return;
     }
 
     const { role, name } = req.body;
 
     if (role && !["ADMIN", "ANALYST", "VIEWER"].includes(role)) {
-      res.status(400).json({ error: "Invalid role specified" });
+      res.status(400).json({
+        error: "Invalid role specified",
+      });
       return;
     }
 
@@ -129,13 +158,20 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    res.json({ user: updatedUser });
+    res.json({
+      user: updatedUser,
+    });
   } catch (error: any) {
     if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({
+        error: error.message,
+      });
       return;
     }
-    res.status(500).json({ error: "Failed to update user" });
+
+    res.status(500).json({
+      error: "Failed to update user",
+    });
   }
 });
 
@@ -143,35 +179,55 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
 router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN"], req);
-    const { id } = req.params;
 
-    const targetUser = await prisma.user.findUnique({ where: { id } });
+    // Convert Express route parameter to a string
+    const id = String(req.params.id);
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+    });
 
     if (!targetUser) {
-      res.status(404).json({ error: "User not found" });
+      res.status(404).json({
+        error: "User not found",
+      });
       return;
     }
 
     if (targetUser.workspaceId !== session.workspaceId) {
-      res.status(403).json({ error: "Forbidden: Cross-workspace access attempt blocked" });
+      res.status(403).json({
+        error: "Forbidden: Cross-workspace access attempt blocked",
+      });
       return;
     }
 
     if (targetUser.id === session.id) {
-      res.status(400).json({ error: "Cannot delete your own active admin account" });
+      res.status(400).json({
+        error: "Cannot delete your own active admin account",
+      });
       return;
     }
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.user.delete({
+      where: { id },
+    });
 
-    res.json({ message: "User removed successfully" });
+    res.json({
+      message: "User removed successfully",
+    });
   } catch (error: any) {
     if (error.statusCode) {
-      res.status(error.statusCode).json({ error: error.message });
+      res.status(error.statusCode).json({
+        error: error.message,
+      });
       return;
     }
-    res.status(500).json({ error: "Failed to delete user" });
+
+    res.status(500).json({
+      error: "Failed to delete user",
+    });
   }
 });
 
 export default router;
+```
