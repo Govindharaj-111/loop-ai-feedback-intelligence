@@ -1,4 +1,4 @@
-```ts
+
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { requireRole } from "../lib/security.js";
@@ -112,7 +112,6 @@ router.patch("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN"], req);
 
-    // Convert Express route parameter to a string
     const id = String(req.params.id);
 
     const targetUser = await prisma.user.findUnique({
@@ -180,7 +179,6 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
   try {
     const session = await requireRole(["ADMIN"], req);
 
-    // Convert Express route parameter to a string
     const id = String(req.params.id);
 
     const targetUser = await prisma.user.findUnique({
@@ -230,4 +228,3 @@ router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
 });
 
 export default router;
-```
