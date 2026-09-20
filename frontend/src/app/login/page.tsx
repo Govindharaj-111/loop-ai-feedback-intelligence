@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { safeFetchJson } from "@/lib/api";
 import {
   ArrowRight,
   Eye,
@@ -37,22 +38,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const response = await safeFetchJson("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Invalid credentials");
+      if (!response.ok) {
+        setError(response.error || "Invalid credentials");
+        return;
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "An unexpected error occurred during login");
     } finally {
       setLoading(false);
     }

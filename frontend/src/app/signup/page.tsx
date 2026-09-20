@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { safeFetchJson } from "@/lib/api";
 import {
   ArrowRight,
   Eye,
@@ -36,22 +37,21 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/signup", {
+      const response = await safeFetchJson("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, workspaceName }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create account");
+      if (!response.ok) {
+        setError(response.error || "Failed to create account and workspace");
+        return;
       }
 
       router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "An unexpected error occurred during signup");
     } finally {
       setLoading(false);
     }

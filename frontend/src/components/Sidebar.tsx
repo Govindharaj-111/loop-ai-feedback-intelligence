@@ -35,9 +35,14 @@ export default function Sidebar({ user }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      console.error("Logout request error:", e);
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
   };
 
   const roleVariantMap: Record<string, "secondary" | "primary" | "success"> = {
