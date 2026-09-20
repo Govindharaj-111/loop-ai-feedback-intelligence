@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:5000";
 
 export async function POST(req: NextRequest) {
+  let body: any;
   try {
-    const body = await req.json();
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid request payload format" },
+      { status: 400 }
+    );
+  }
 
+  try {
     const backendRes = await fetch(`${BACKEND_URL}/api/auth/signup`, {
       method: "POST",
       headers: {
@@ -16,14 +24,15 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const contentType = backendRes.headers.get("content-type") || "";
+    const rawText = await backendRes.text();
     let data: any = {};
 
-    if (contentType.includes("application/json")) {
-      data = await backendRes.json();
-    } else {
-      const text = await backendRes.text();
-      data = { error: text || `Backend API error (${backendRes.status})` };
+    if (rawText && rawText.trim()) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { error: rawText.trim() || `Backend error (${backendRes.status})` };
+      }
     }
 
     const response = NextResponse.json(data, { status: backendRes.status });

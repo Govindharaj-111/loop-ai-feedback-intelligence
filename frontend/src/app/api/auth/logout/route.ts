@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:5000";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,13 +13,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const contentType = backendRes.headers.get("content-type") || "";
+    const rawText = await backendRes.text();
     let data: any = {};
 
-    if (contentType.includes("application/json")) {
-      data = await backendRes.json();
-    } else {
-      data = { message: "Logout processed" };
+    if (rawText && rawText.trim()) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { message: "Logout processed" };
+      }
     }
 
     const response = NextResponse.json(data, { status: backendRes.status });
