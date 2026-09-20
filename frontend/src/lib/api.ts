@@ -24,42 +24,43 @@ export async function safeFetchJson<T = any>(
       },
     });
 
-    const contentType = res.headers.get("content-type") || "";
+    const rawText = await res.text();
     let parsedData: any = null;
-    let fallbackText = "";
+    let isJson = false;
 
-    if (contentType.includes("application/json")) {
+    if (rawText && rawText.trim()) {
       try {
-        parsedData = await res.json();
-      } catch (jsonErr: any) {
-        fallbackText = "Failed to parse server JSON response.";
-      }
-    } else {
-      try {
-        const rawText = await res.text();
-        // If server returns HTML error page (e.g. Next.js 404/500 HTML), capture clean message
-        if (rawText.includes("<!DOCTYPE html>") || rawText.includes("<html") || rawText.includes("The page could not be found")) {
-          fallbackText = `Server endpoint non-JSON response (${res.status} ${res.statusText}). Please ensure backend API is running.`;
-        } else {
-          fallbackText = rawText.trim() || `Server returned status ${res.status}`;
-        }
-      } catch {
-        fallbackText = `Server returned status ${res.status}`;
+        parsedData = JSON.parse(rawText);
+        isJson = true;
+      } catch (jsonErr) {
+        isJson = false;
       }
     }
 
     if (!res.ok) {
-      const errorMessage =
-        parsedData?.error ||
-        parsedData?.message ||
-        fallbackText ||
-        `Request failed with status code ${res.status}`;
+      let errorMessage = parsedData?.error || parsedData?.message;
+
+      if (!errorMessage) {
+        if (rawText.includes("<!DOCTYPE html>") || rawText.includes("<html") || rawText.includes("The page c") || !isJson) {
+          errorMessage = `Server endpoint error (${res.status}). Please verify backend API server is running.`;
+        } else {
+          errorMessage = rawText.trim() || `Request failed with status ${res.status}`;
+        }
+      }
 
       return {
         ok: false,
         status: res.status,
         error: errorMessage,
         data: parsedData,
+      };
+    }
+
+    if (!isJson && rawText.trim()) {
+      return {
+        ok: false,
+        status: res.status,
+        error: "Server returned a non-JSON response.",
       };
     }
 
@@ -77,3 +78,4 @@ export async function safeFetchJson<T = any>(
     };
   }
 }
+
