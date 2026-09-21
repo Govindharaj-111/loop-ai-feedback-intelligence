@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: project-loop-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: JWT_SECRET
+        value: project-loop-super-secret-jwt-key-2026-secure
+      - key: FRONTEND_URL
+        value: http://localhost:3000

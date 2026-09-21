@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://127.0.0.1:5000";
+import { getBackendUrl } from "@/lib/config";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -18,7 +13,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const backendRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    const backendUrl = getBackendUrl();
+    const backendRes = await fetch(`${backendUrl}/api/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
