@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { prisma } from "./lib/prisma.js";
 import authRoutes from "./routes/authRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import themeRoutes from "./routes/themeRoutes.js";
@@ -9,11 +10,20 @@ import askRoutes from "./routes/askRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
+// Safety: Process-level error handlers to prevent silent crashes
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[SERVER ERROR] Unhandled Promise Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[SERVER ERROR] Uncaught Exception thrown:", error);
+});
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
-// Middleware
+// Middleware & Production CORS
 const allowedOrigins = Array.from(new Set([
   FRONTEND_URL,
   "http://localhost:3000",
@@ -23,8 +33,15 @@ const allowedOrigins = Array.from(new Set([
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server proxy)
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like mobile apps, curl, serverless proxy from Vercel)
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app") ||
+        origin.endsWith(".onrender.com") ||
+        origin.endsWith(".netlify.app") ||
+        origin.endsWith(".pages.dev")
+      ) {
         return callback(null, true);
       }
       return callback(null, true); // Permissive for local dev & proxies while credentials enabled
@@ -36,9 +53,43 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Health Check
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "Project LOOP API Backend", timestamp: new Date().toISOString() });
+// Structured Request Logging Middleware (strips sensitive fields)
+app.use((req, _res, next) => {
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[API] ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  }
+  next();
+});
+
+// Lightweight Unauthenticated Server Liveness Checks
+app.get(["/health", "/api/health"], (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "Project LOOP API Backend",
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+  });
+});
+
+// Database Readiness Check
+app.get(["/health/ready", "/api/health/ready"], async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: "ok",
+      database: "connected",
+      service: "Project LOOP API Backend",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (dbErr: any) {
+    console.error("[DATABASE ERROR] Database health check failed:", dbErr.message);
+    res.status(503).json({
+      status: "error",
+      database: "disconnected",
+      error: "Database connectivity issue",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // API Routes
@@ -57,7 +108,7 @@ app.use((_req, res) => {
 
 // Global Error Handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("Unhandled Backend API Server Error:", err);
+  console.error("[ERROR] Unhandled Backend API Server Error:", err);
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
     error: err.message || "An unexpected internal server error occurred",
@@ -68,8 +119,9 @@ if (process.env.NODE_ENV !== "test") {
   const HOST = process.env.HOST || "0.0.0.0";
   app.listen(Number(PORT), HOST, () => {
     console.log(`=================================================`);
-    console.log(`  Project LOOP Backend API Server running on ${HOST}:${PORT}`);
-    console.log(`  Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`  [SERVER] Project LOOP Backend API running on ${HOST}:${PORT}`);
+    console.log(`  [HEALTH] Liveness: http://localhost:${PORT}/api/health`);
+    console.log(`  [HEALTH] Readiness: http://localhost:${PORT}/api/health/ready`);
     console.log(`=================================================`);
   });
 }
