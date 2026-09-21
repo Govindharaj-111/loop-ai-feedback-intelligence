@@ -3,6 +3,15 @@
  * Inspects all common environment variable names used across Vercel, Render, Netlify, AWS, etc.
  * Ensures trailing slashes are stripped to avoid double-slash route errors (e.g., //api/auth/signup).
  */
+export function isBackendUrlConfigured(): boolean {
+  return Boolean(
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL
+  );
+}
+
 export function getBackendUrl(): string {
   const rawUrl =
     process.env.BACKEND_URL ||

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendUrl } from "@/lib/config";
+import { getBackendUrl, isBackendUrlConfigured } from "@/lib/config";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -9,6 +9,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Invalid request payload format" },
       { status: 400 }
+    );
+  }
+
+  if (process.env.NODE_ENV === "production" && !isBackendUrlConfigured()) {
+    console.error("[SIGNUP ROUTE ERROR] Production BACKEND_URL environment variable is not configured on Vercel.");
+    return NextResponse.json(
+      {
+        error: "Production Configuration Error: BACKEND_URL environment variable is missing in Vercel settings. Please add BACKEND_URL (e.g. https://your-backend.onrender.com) to Vercel Environment Variables and redeploy.",
+      },
+      { status: 503 }
     );
   }
 
