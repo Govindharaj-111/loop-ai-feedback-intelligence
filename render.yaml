@@ -3,7 +3,7 @@ services:
     name: project-loop-backend
     env: node
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && npm run db:setup
     startCommand: npm start
     envVars:
       - key: PORT
@@ -11,8 +11,8 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: file:./dev.db
+        value: postgresql://postgres:your_password@ep-example-123456.us-east-1.aws.neon.tech/project_loop?sslmode=require
       - key: JWT_SECRET
         value: project-loop-super-secret-jwt-key-2026-secure
       - key: FRONTEND_URL
-        value: http://localhost:3000
+        value: https://loop-ai-feedback-intelligence.vercel.app
