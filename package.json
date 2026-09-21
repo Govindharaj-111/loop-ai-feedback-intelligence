@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "powershell -Command \"Start-Process npm -ArgumentList '--prefix backend run dev'; npm --prefix frontend run dev\"",
+    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"blue,magenta\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
@@ -20,6 +20,7 @@
     "backend"
   ],
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "typescript": "^5.7.3"
   }
 }
