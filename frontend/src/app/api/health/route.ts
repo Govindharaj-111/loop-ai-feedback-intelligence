@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/config";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const backendUrl = getBackendUrl();
+  if (!backendUrl) {
+    return NextResponse.json(
+      {
+        status: "unconfigured",
+        frontend: "online",
+        backend: "unconfigured",
+        error: "BACKEND_URL is not configured",
+      },
+      { status: 500 }
+    );
+  }
+
   try {
     const backendRes = await fetch(`${backendUrl}/api/health`, {
       method: "GET",
@@ -38,7 +52,7 @@ export async function GET() {
         frontend: "online",
         backend: "unreachable",
         backendUrl,
-        error: err.message || "Failed to reach backend API server",
+        error: err.message || "Failed to connect to backend API server",
       },
       { status: 503 }
     );

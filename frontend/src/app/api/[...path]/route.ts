@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/config";
 
-async function proxyRequest(req: NextRequest, params: { path: string[] }) {
+export const dynamic = "force-dynamic";
+
+async function proxyRequest(req: NextRequest, pathParams: string[]) {
   const backendUrl = getBackendUrl();
-  const subPath = params.path ? params.path.join("/") : "";
+
+  if (!backendUrl) {
+    return NextResponse.json(
+      { error: "BACKEND_URL is not configured" },
+      { status: 500 }
+    );
+  }
+
+  const subPath = pathParams && pathParams.length > 0 ? pathParams.join("/") : "";
   const targetUrl = `${backendUrl}/api/${subPath}${req.nextUrl.search}`;
 
   try {
-    const headers: Record<string, string> = {
-      "Accept": "application/json",
-      "cookie": req.headers.get("cookie") || "",
-      "authorization": req.headers.get("authorization") || "",
-    };
+    const headers = new Headers();
+    
+    // Forward essential request headers
+    const reqCookie = req.headers.get("cookie");
+    if (reqCookie) headers.set("cookie", reqCookie);
 
-    const contentType = req.headers.get("content-type");
-    if (contentType) {
-      headers["content-type"] = contentType;
-    }
+    const reqAuth = req.headers.get("authorization");
+    if (reqAuth) headers.set("authorization", reqAuth);
+
+    const reqContentType = req.headers.get("content-type");
+    if (reqContentType) headers.set("content-type", reqContentType);
+
+    headers.set("accept", "application/json");
 
     let body: any = null;
     if (["POST", "PUT", "PATCH"].includes(req.method)) {
@@ -37,23 +50,29 @@ async function proxyRequest(req: NextRequest, params: { path: string[] }) {
       try {
         data = JSON.parse(rawText);
       } catch {
-        data = { error: rawText.trim() || `Backend API error (${backendRes.status})` };
+        data = { error: rawText.trim() || `Backend returned status ${backendRes.status}` };
       }
     }
 
     const response = NextResponse.json(data, { status: backendRes.status });
 
-    const setCookie = backendRes.headers.get("set-cookie");
-    if (setCookie) {
-      response.headers.set("set-cookie", setCookie);
+    // Pass through Set-Cookie headers from backend response
+    const setCookies = backendRes.headers.getSetCookie
+      ? backendRes.headers.getSetCookie()
+      : [backendRes.headers.get("set-cookie")].filter(Boolean) as string[];
+
+    for (const cookieStr of setCookies) {
+      if (cookieStr) {
+        response.headers.append("set-cookie", cookieStr);
+      }
     }
 
     return response;
   } catch (err: any) {
-    console.error(`[PROXY ERROR] Failed to proxy ${req.method} /api/${subPath} -> ${targetUrl}:`, err);
+    console.error(`[PROXY ERROR] Forwarding ${req.method} /api/${subPath} to ${targetUrl} failed:`, err);
     return NextResponse.json(
       {
-        error: `Backend API service is unavailable. Could not connect to target URL: ${targetUrl}`,
+        error: `Backend API server is unreachable at ${targetUrl}. Cause: ${err?.message || "Connection refused/timeout"}`,
       },
       { status: 503 }
     );
@@ -62,25 +81,25 @@ async function proxyRequest(req: NextRequest, params: { path: string[] }) {
 
 export async function GET(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const params = await context.params;
-  return proxyRequest(req, params);
+  return proxyRequest(req, params.path);
 }
 
 export async function POST(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const params = await context.params;
-  return proxyRequest(req, params);
+  return proxyRequest(req, params.path);
 }
 
 export async function PUT(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const params = await context.params;
-  return proxyRequest(req, params);
+  return proxyRequest(req, params.path);
 }
 
 export async function DELETE(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const params = await context.params;
-  return proxyRequest(req, params);
+  return proxyRequest(req, params.path);
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const params = await context.params;
-  return proxyRequest(req, params);
+  return proxyRequest(req, params.path);
 }

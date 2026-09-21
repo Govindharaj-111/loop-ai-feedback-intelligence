@@ -20,6 +20,10 @@ process.on("uncaughtException", (error) => {
 });
 
 const app = express();
+
+// Enable reverse proxy trust for headers (X-Forwarded-For, X-Forwarded-Proto) behind Render/Vercel proxies
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -33,7 +37,6 @@ const allowedOrigins = Array.from(new Set([
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, serverless proxy from Vercel)
       if (
         !origin ||
         allowedOrigins.includes(origin) ||
@@ -44,7 +47,7 @@ app.use(
       ) {
         return callback(null, true);
       }
-      return callback(null, true); // Permissive for local dev & proxies while credentials enabled
+      return callback(null, true);
     },
     credentials: true,
   })
@@ -53,7 +56,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Structured Request Logging Middleware (strips sensitive fields)
+// Structured Request Logging Middleware
 app.use((req, _res, next) => {
   if (process.env.NODE_ENV !== "test") {
     console.log(`[API] ${req.method} ${req.path} - ${new Date().toISOString()}`);
@@ -61,35 +64,24 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Lightweight Unauthenticated Server Liveness Checks
-app.get(["/health", "/api/health"], (_req, res) => {
-  res.json({
-    status: "ok",
+// Health Probe (Liveness & Database Readiness Check)
+app.get(["/health", "/api/health"], async (_req, res) => {
+  let dbStatus = "connected";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (dbErr: any) {
+    dbStatus = "disconnected";
+    console.error("[DATABASE ERROR] Database health check failed:", dbErr.message);
+  }
+
+  const isOk = dbStatus === "connected";
+  res.status(isOk ? 200 : 503).json({
+    status: isOk ? "ok" : "degraded",
+    database: dbStatus,
     service: "Project LOOP API Backend",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
   });
-});
-
-// Database Readiness Check
-app.get(["/health/ready", "/api/health/ready"], async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({
-      status: "ok",
-      database: "connected",
-      service: "Project LOOP API Backend",
-      timestamp: new Date().toISOString(),
-    });
-  } catch (dbErr: any) {
-    console.error("[DATABASE ERROR] Database health check failed:", dbErr.message);
-    res.status(503).json({
-      status: "error",
-      database: "disconnected",
-      error: "Database connectivity issue",
-      timestamp: new Date().toISOString(),
-    });
-  }
 });
 
 // API Routes
@@ -120,8 +112,7 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(Number(PORT), HOST, () => {
     console.log(`=================================================`);
     console.log(`  [SERVER] Project LOOP Backend API running on ${HOST}:${PORT}`);
-    console.log(`  [HEALTH] Liveness: http://localhost:${PORT}/api/health`);
-    console.log(`  [HEALTH] Readiness: http://localhost:${PORT}/api/health/ready`);
+    console.log(`  [HEALTH] Liveness & DB Check: http://localhost:${PORT}/api/health`);
     console.log(`=================================================`);
   });
 }

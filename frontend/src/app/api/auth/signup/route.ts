@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendUrl, isBackendUrlConfigured } from "@/lib/config";
+import { getBackendUrl } from "@/lib/config";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -7,28 +9,23 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid request payload format" },
+      { error: "Invalid JSON payload" },
       { status: 400 }
     );
   }
 
-  if (process.env.NODE_ENV === "production" && !isBackendUrlConfigured()) {
-    console.error("[SIGNUP ROUTE ERROR] Production BACKEND_URL environment variable is not configured on Vercel.");
+  const backendUrl = getBackendUrl();
+  if (!backendUrl) {
     return NextResponse.json(
-      {
-        error: "Production Configuration Error: BACKEND_URL environment variable is missing in Vercel settings. Please add BACKEND_URL (e.g. https://your-backend.onrender.com) to Vercel Environment Variables and redeploy.",
-      },
-      { status: 503 }
+      { error: "BACKEND_URL is not configured" },
+      { status: 500 }
     );
   }
 
-  const backendUrl = getBackendUrl();
   const targetEndpoint = `${backendUrl}/api/auth/signup`;
-
   let backendRes: Response | null = null;
   let lastError: any = null;
 
-  // Try up to 2 times to absorb cold-start delays on sleeping backend instances
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       backendRes = await fetch(targetEndpoint, {
@@ -41,21 +38,19 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(body),
         cache: "no-store",
       });
-      break; // Request succeeded, break loop
+      break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`[SIGNUP ROUTE] Attempt ${attempt} failed fetching ${targetEndpoint}: ${err.message}`);
       if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 1500)); // Wait 1.5s for backend warmup
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     }
   }
 
   if (!backendRes) {
-    console.error(`[SIGNUP ROUTE ERROR] Target URL ${targetEndpoint} unreachable:`, lastError);
     return NextResponse.json(
       {
-        error: `Backend API service at ${backendUrl} is unavailable or starting up. Please verify backend server is running.`,
+        error: `Backend API server is unreachable at ${targetEndpoint}. Cause: ${lastError?.message || "Connection refused/timeout"}`,
       },
       { status: 503 }
     );
@@ -68,16 +63,20 @@ export async function POST(req: NextRequest) {
     try {
       data = JSON.parse(rawText);
     } catch {
-      data = { error: rawText.trim() || `Backend API error (${backendRes.status})` };
+      data = { error: rawText.trim() || `Backend returned status ${backendRes.status}` };
     }
   }
 
   const response = NextResponse.json(data, { status: backendRes.status });
 
-  // Forward Set-Cookie headers from backend if present
-  const setCookie = backendRes.headers.get("set-cookie");
-  if (setCookie) {
-    response.headers.set("set-cookie", setCookie);
+  const setCookies = backendRes.headers.getSetCookie
+    ? backendRes.headers.getSetCookie()
+    : [backendRes.headers.get("set-cookie")].filter(Boolean) as string[];
+
+  for (const cookieStr of setCookies) {
+    if (cookieStr) {
+      response.headers.append("set-cookie", cookieStr);
+    }
   }
 
   return response;

@@ -1,25 +1,26 @@
 /**
- * Helper utility to get the configured Backend API base URL.
- * Inspects all common environment variable names used across Vercel, Render, Netlify, AWS, etc.
- * Ensures trailing slashes are stripped to avoid double-slash route errors (e.g., //api/auth/signup).
+ * Helper utility to resolve the configured Backend API base URL.
+ * Only uses localhost:5000 as a fallback during local development (NODE_ENV === "development").
+ * In production, requires process.env.BACKEND_URL or NEXT_PUBLIC_BACKEND_URL to be set.
  */
-export function isBackendUrlConfigured(): boolean {
-  return Boolean(
-    process.env.BACKEND_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL
-  );
-}
-
-export function getBackendUrl(): string {
+export function getBackendUrl(): string | null {
   const rawUrl =
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL ||
-    "http://127.0.0.1:5000";
+    process.env.API_URL;
 
-  // Remove trailing slash if present
-  return rawUrl.trim().replace(/\/+$/, "");
+  if (rawUrl && rawUrl.trim()) {
+    return rawUrl.trim().replace(/\/+$/, "");
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    return "http://127.0.0.1:5000";
+  }
+
+  return null;
+}
+
+export function isBackendUrlConfigured(): boolean {
+  return getBackendUrl() !== null;
 }
